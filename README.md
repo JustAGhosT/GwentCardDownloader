@@ -30,7 +30,39 @@ Run the following command to add the HtmlAgilityPack NuGet package:
 dotnet add package HtmlAgilityPack
 ```
 
-### 3. Replace the content of `Program.cs` with the provided code
+### 3. Add the System.Drawing.Common NuGet package
+
+Run the following command to add the System.Drawing.Common NuGet package:
+
+```sh
+dotnet add package System.Drawing.Common
+```
+
+### 4. Add the ShellProgressBar NuGet package
+
+Run the following command to add the ShellProgressBar NuGet package:
+
+```sh
+dotnet add package ShellProgressBar
+```
+
+### 5. Add the NLog NuGet package
+
+Run the following command to add the NLog NuGet package:
+
+```sh
+dotnet add package NLog
+```
+
+### 6. Add the Serilog NuGet package
+
+Run the following command to add the Serilog NuGet package:
+
+```sh
+dotnet add package Serilog
+```
+
+### 7. Replace the content of `Program.cs` with the provided code
 
 Replace the content of the `Program.cs` file in your project with the following code:
 
@@ -238,7 +270,7 @@ namespace GwentCardDownloader
 }
 ```
 
-### 4. Run the application
+### 8. Run the application
 
 Run the application using the following command:
 

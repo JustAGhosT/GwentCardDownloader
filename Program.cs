@@ -1,40 +1,3 @@
-# Gwent Card Downloader
-
-This repository contains a .NET Core console application to download Gwent cards. The application uses `HttpClient` for web requests and `HtmlAgilityPack` for HTML parsing.
-
-## Instructions
-
-### 1. Create a new .NET Core Console application
-
-Run the following command to create a new .NET Core Console application:
-
-```sh
-dotnet new console -n GwentCardDownloader
-```
-
-### 2. Add the HtmlAgilityPack NuGet package
-
-You can add the HtmlAgilityPack NuGet package using one of the following methods:
-
-#### Using Visual Studio's NuGet Package Manager
-
-1. Right-click on the project in the Solution Explorer.
-2. Select "Manage NuGet Packages".
-3. Search for "HtmlAgilityPack" and install it.
-
-#### Using the command line
-
-Run the following command to add the HtmlAgilityPack NuGet package:
-
-```sh
-dotnet add package HtmlAgilityPack
-```
-
-### 3. Replace the content of `Program.cs` with the provided code
-
-Replace the content of the `Program.cs` file in your project with the following code:
-
-```csharp
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -146,14 +109,3 @@ namespace GwentCardDownloader
         }
     }
 }
-```
-
-### 4. Run the application
-
-Run the application using the following command:
-
-```sh
-dotnet run --project GwentCardDownloader
-```
-
-The application will start downloading Gwent cards and save them in the `gwent_cards` folder.

@@ -41,40 +41,69 @@ using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
+using System.Linq;
+using System.Drawing;
+using System.Net.Http.Headers;
+using System.Threading;
+using NLog;
+using ShellProgressBar;
 
 namespace GwentCardDownloader
 {
     class Program
     {
         private static readonly HttpClient client = new HttpClient();
-        private const string BaseUrl = "https://gwent.one/en/cards/";
-        private const string ImageFolder = "gwent_cards";
+        private const string DefaultBaseUrl = "https://gwent.one/en/cards/";
+        private const string DefaultImageFolder = "gwent_cards";
+        private const int DefaultDelay = 100;
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private static string resumeFilePath = "resume.txt";
 
         static async Task Main(string[] args)
         {
+            string baseUrl = DefaultBaseUrl;
+            string imageFolder = DefaultImageFolder;
+            int delay = DefaultDelay;
+
+            if (args.Length > 0)
+            {
+                baseUrl = args.ElementAtOrDefault(0) ?? DefaultBaseUrl;
+                imageFolder = args.ElementAtOrDefault(1) ?? DefaultImageFolder;
+                delay = int.TryParse(args.ElementAtOrDefault(2), out int parsedDelay) ? parsedDelay : DefaultDelay;
+            }
+
             // Create directory if it doesn't exist
-            Directory.CreateDirectory(ImageFolder);
+            Directory.CreateDirectory(imageFolder);
+
+            // Configure logging
+            var config = new NLog.Config.LoggingConfiguration();
+            var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "logfile.txt" };
+            config.AddRule(LogLevel.Info, LogLevel.Fatal, logfile);
+            LogManager.Configuration = config;
+
+            // Set User-Agent header
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("GwentCardDownloader/1.0");
 
             try
             {
-                Console.WriteLine("Starting Gwent card download...");
-                await DownloadAllCards();
-                Console.WriteLine("Download completed!");
+                logger.Info("Starting Gwent card download...");
+                await DownloadAllCards(baseUrl, imageFolder, delay);
+                logger.Info("Download completed!");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                logger.Error(ex, "An error occurred");
             }
 
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
         }
 
-        static async Task DownloadAllCards()
+        static async Task DownloadAllCards(string baseUrl, string imageFolder, int delay)
         {
             // Get the main page content
             var web = new HtmlWeb();
-            var doc = await web.LoadFromWebAsync(BaseUrl);
+            var doc = await web.LoadFromWebAsync(baseUrl);
 
             // Find all card containers
             var cardNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'gwent-card')]");
@@ -87,61 +116,122 @@ namespace GwentCardDownloader
             int totalCards = cardNodes.Count;
             int currentCard = 0;
 
-            foreach (var cardNode in cardNodes)
+            var progressBarOptions = new ProgressBarOptions
             {
-                currentCard++;
+                ForegroundColor = ConsoleColor.Yellow,
+                BackgroundColor = ConsoleColor.DarkGray,
+                ProgressCharacter = '─'
+            };
 
-                try
+            var downloadedCards = new HashSet<string>(File.Exists(resumeFilePath) ? File.ReadAllLines(resumeFilePath) : Array.Empty<string>());
+
+            using (var progressBar = new ProgressBar(totalCards, "Downloading cards", progressBarOptions))
+            {
+                var tasks = cardNodes.Select(async cardNode =>
                 {
-                    // Extract card details
-                    var cardId = cardNode.GetAttributeValue("data-card-id", "");
-                    var cardName = cardNode.SelectSingleNode(".//div[contains(@class, 'card-name')]")?.InnerText.Trim();
+                    Interlocked.Increment(ref currentCard);
 
-                    if (string.IsNullOrEmpty(cardId) || string.IsNullOrEmpty(cardName))
+                    try
                     {
-                        Console.WriteLine($"Skipping card - missing information");
-                        continue;
+                        // Extract card details
+                        var cardId = cardNode.GetAttributeValue("data-card-id", "");
+                        var cardName = cardNode.SelectSingleNode(".//div[contains(@class, 'card-name')]")?.InnerText.Trim();
+
+                        if (string.IsNullOrEmpty(cardId) || string.IsNullOrEmpty(cardName))
+                        {
+                            logger.Warn("Skipping card - missing information");
+                            return;
+                        }
+
+                        // Clean filename
+                        string safeFileName = string.Join("_", cardName.Split(Path.GetInvalidFileNameChars()));
+                        string filePath = Path.Combine(imageFolder, $"{safeFileName}.png");
+
+                        // Skip if file already exists
+                        if (File.Exists(filePath) || downloadedCards.Contains(cardId))
+                        {
+                            logger.Info($"Skipping existing card: {cardName}");
+                            return;
+                        }
+
+                        // Construct image URL (you might need to adjust this based on the website structure)
+                        string imageUrl = $"https://gwent.one/image/card/low/{cardId}.jpg";
+
+                        // Download the image
+                        await DownloadImage(imageUrl, filePath);
+
+                        // Verify the image
+                        if (!VerifyImage(filePath))
+                        {
+                            logger.Warn($"Image verification failed for {cardName}, retrying...");
+                            await DownloadImage(imageUrl, filePath);
+                            if (!VerifyImage(filePath))
+                            {
+                                logger.Error($"Image verification failed for {cardName} after retrying");
+                                return;
+                            }
+                        }
+
+                        logger.Info($"Downloaded ({currentCard}/{totalCards}): {cardName}");
+
+                        // Add to resume file
+                        File.AppendAllLines(resumeFilePath, new[] { cardId });
+
+                        // Add a small delay to be nice to the server
+                        await Task.Delay(delay);
                     }
-
-                    // Clean filename
-                    string safeFileName = string.Join("_", cardName.Split(Path.GetInvalidFileNameChars()));
-                    string filePath = Path.Combine(ImageFolder, $"{safeFileName}.png");
-
-                    // Skip if file already exists
-                    if (File.Exists(filePath))
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"Skipping existing card: {cardName}");
-                        continue;
+                        logger.Error(ex, $"Error processing card");
                     }
+                    finally
+                    {
+                        progressBar.Tick();
+                    }
+                }).ToList();
 
-                    // Construct image URL (you might need to adjust this based on the website structure)
-                    string imageUrl = $"https://gwent.one/image/card/low/{cardId}.jpg";
-
-                    // Download the image
-                    await DownloadImage(imageUrl, filePath);
-
-                    Console.WriteLine($"Downloaded ({currentCard}/{totalCards}): {cardName}");
-
-                    // Add a small delay to be nice to the server
-                    await Task.Delay(100);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error processing card: {ex.Message}");
-                }
+                await Task.WhenAll(tasks);
             }
         }
 
         static async Task DownloadImage(string imageUrl, string filePath)
         {
+            int maxRetries = 3;
+            int retryDelay = 2000;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    var imageBytes = await client.GetByteArrayAsync(imageUrl);
+                    await File.WriteAllBytesAsync(filePath, imageBytes);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, $"Failed to download image from {imageUrl}, attempt {attempt} of {maxRetries}");
+                    if (attempt == maxRetries)
+                    {
+                        throw;
+                    }
+                    await Task.Delay(retryDelay);
+                    retryDelay *= 2; // Exponential backoff
+                }
+            }
+        }
+
+        static bool VerifyImage(string filePath)
+        {
             try
             {
-                var imageBytes = await client.GetByteArrayAsync(imageUrl);
-                await File.WriteAllBytesAsync(filePath, imageBytes);
+                using (var image = Image.FromFile(filePath))
+                {
+                    return true;
+                }
             }
-            catch (Exception ex)
+            catch
             {
-                throw new Exception($"Failed to download image from {imageUrl}: {ex.Message}");
+                return false;
             }
         }
     }

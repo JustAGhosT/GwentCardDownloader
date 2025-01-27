@@ -23,6 +23,7 @@ namespace GwentCardDownloader
         private readonly string resumeFilePath;
         private int currentCard;
         private int totalCards;
+        private readonly ImageProcessor imageProcessor;
 
         public Downloader(string baseUrl, string imageFolder, int delay, Logger logger, string resumeFilePath)
         {
@@ -34,6 +35,7 @@ namespace GwentCardDownloader
             this.resumeFilePath = resumeFilePath;
             this.currentCard = 0;
             this.totalCards = 0;
+            this.imageProcessor = new ImageProcessor();
 
             // Set User-Agent header
             client.DefaultRequestHeaders.UserAgent.ParseAdd("GwentCardDownloader/1.0");
@@ -97,13 +99,13 @@ namespace GwentCardDownloader
                         string imageUrl = $"https://gwent.one/image/card/low/{cardId}.jpg";
 
                         // Download the image
-                        await DownloadImage(imageUrl, filePath);
+                        await DownloadImage(imageUrl, filePath, _config.Quality);
 
                         // Verify the image
                         if (!VerifyImage(filePath))
                         {
                             logger.Warn($"Image verification failed for {cardName}, retrying...");
-                            await DownloadImage(imageUrl, filePath);
+                            await DownloadImage(imageUrl, filePath, _config.Quality);
                             if (!VerifyImage(filePath))
                             {
                                 logger.Error($"Image verification failed for {cardName} after retrying");
@@ -133,7 +135,7 @@ namespace GwentCardDownloader
             }
         }
 
-        private async Task DownloadImage(string imageUrl, string filePath)
+        private async Task DownloadImage(string imageUrl, string filePath, ImageQuality quality)
         {
             int maxRetries = 3;
             int retryDelay = 2000;
@@ -144,6 +146,10 @@ namespace GwentCardDownloader
                 {
                     var imageBytes = await client.GetByteArrayAsync(imageUrl);
                     await File.WriteAllBytesAsync(filePath, imageBytes);
+
+                    // Process the image based on the specified quality
+                    await imageProcessor.ProcessImageAsync(filePath, quality);
+
                     return;
                 }
                 catch (Exception ex)
@@ -181,7 +187,7 @@ namespace GwentCardDownloader
                 string imageUrl = card.GetImageUrl();
                 string localPath = card.GetLocalPath();
 
-                await DownloadImage(imageUrl, localPath);
+                await DownloadImage(imageUrl, localPath, _config.Quality);
 
                 if (!VerifyImage(localPath))
                 {

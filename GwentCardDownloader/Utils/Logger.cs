@@ -25,5 +25,20 @@ namespace GwentCardDownloader.Utils
         {
             logger.Error(ex, message);
         }
+
+        public void Debug(string message)
+        {
+            logger.Debug(message);
+        }
+
+        public void Trace(string message)
+        {
+            logger.Trace(message);
+        }
+
+        public void Fatal(string message)
+        {
+            logger.Fatal(message);
+        }
     }
 }

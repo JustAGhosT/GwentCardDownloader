@@ -1,39 +1,40 @@
 using System;
-using System.Collections.Generic;
-using ShellProgressBar;
+using System.Collections.Concurrent;
+using System.Threading;
 
 namespace GwentCardDownloader.Utils
 {
     public class DownloadProgress
     {
-        private readonly ShellProgressBar.ProgressBar _mainProgressBar;
-        private readonly Dictionary<string, ChildProgressBar> _childBars;
-        private readonly object _lockObject = new object();
+        private readonly ConcurrentDictionary<string, (string status, int progress)> _progress;
+        private readonly int _totalItems;
+        private int _completedItems;
 
-        public DownloadProgress(int totalCards)
+        public DownloadProgress(int totalItems)
         {
-            var options = new ProgressBarOptions
-            {
-                ForegroundColor = ConsoleColor.Yellow,
-                BackgroundColor = ConsoleColor.DarkGray,
-                ProgressCharacter = '─',
-                EnableTaskBarProgress = true,
-                ShowEstimatedDuration = true
-            };
-
-            _mainProgressBar = new ShellProgressBar.ProgressBar(totalCards, "Downloading cards", options);
-            _childBars = new Dictionary<string, ChildProgressBar>();
+            _totalItems = totalItems;
+            _progress = new ConcurrentDictionary<string, (string status, int progress)>();
+            _completedItems = 0;
         }
 
-        public void UpdateProgress(string cardId, string message, int progress)
+        public void UpdateProgress(string itemId, string status, int progress)
         {
-            lock (_lockObject)
+            _progress[itemId] = (status, progress);
+            if (progress == 100)
             {
-                if (!_childBars.ContainsKey(cardId))
-                {
-                    _childBars[cardId] = _mainProgressBar.Spawn(100, $"Card: {cardId}");
-                }
-                _childBars[cardId].Tick(progress, message);
+                Interlocked.Increment(ref _completedItems);
+            }
+            DisplayProgress();
+        }
+
+        private void DisplayProgress()
+        {
+            Console.Clear();
+            Console.WriteLine($"Progress: {_completedItems}/{_totalItems} items completed");
+
+            foreach (var item in _progress)
+            {
+                Console.WriteLine($"{item.Key}: {item.Value.status} ({item.Value.progress}%)");
             }
         }
     }

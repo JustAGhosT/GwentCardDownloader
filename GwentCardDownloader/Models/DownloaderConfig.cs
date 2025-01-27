@@ -7,7 +7,16 @@ namespace GwentCardDownloader.Models
 {
     public class DownloaderConfig
     {
-        public string BaseUrl { get; set; }
+        private string _baseUrl;
+
+        public string BaseUrl
+        {
+            get => _baseUrl;
+            set => _baseUrl = Uri.IsWellFormedUriString(value, UriKind.Absolute)
+                ? value
+                : throw new ArgumentException("Invalid URL format");
+        }
+
         public string ImageFolder { get; set; }
         public int Delay { get; set; }
         public int MaxRetries { get; set; }
@@ -16,6 +25,7 @@ namespace GwentCardDownloader.Models
         public ImageQuality Quality { get; set; }
         public string UserAgent { get; set; }
         public Dictionary<string, string> Headers { get; set; }
+        public RateLimitConfig RateLimit { get; set; } = new();
 
         public DownloaderConfig()
         {
@@ -45,6 +55,20 @@ namespace GwentCardDownloader.Models
 
             var json = File.ReadAllText(filePath);
             return JsonConvert.DeserializeObject<DownloaderConfig>(json);
+        }
+
+        public bool Validate()
+        {
+            return !string.IsNullOrEmpty(BaseUrl)
+                && Delay >= 0
+                && MaxRetries > 0
+                && MaxConcurrentDownloads > 0;
+        }
+
+        public class RateLimitConfig
+        {
+            public int RequestsPerMinute { get; set; } = 60;
+            public int BurstSize { get; set; } = 10;
         }
     }
 

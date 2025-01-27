@@ -470,7 +470,7 @@ namespace GwentCardDownloader
             }
         }
 
-        private bool VerifyImage(string filePath)
+        static bool VerifyImage(string filePath)
         {
             try
             {

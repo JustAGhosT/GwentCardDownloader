@@ -175,7 +175,98 @@ namespace GwentCardDownloader
 }
 ```
 
-### 9. Create the `DownloadProgress` class
+### 9. Create the `DownloadManager` class
+
+Create a new file named `DownloadManager.cs` in the `GwentCardDownloader` directory and add the following code:
+
+```csharp
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using Polly;
+
+namespace GwentCardDownloader
+{
+    public class DownloadManager
+    {
+        private readonly SemaphoreSlim _semaphore;
+        private readonly ConcurrentDictionary<string, Card> _cards;
+        private readonly DownloaderConfig _config;
+        private readonly Logger _logger;
+
+        public DownloadManager(DownloaderConfig config, Logger logger)
+        {
+            _semaphore = new SemaphoreSlim(config.MaxConcurrentDownloads);
+            _cards = new ConcurrentDictionary<string, Card>();
+            _config = config;
+            _logger = logger;
+        }
+
+        public async Task DownloadCardsAsync(IEnumerable<Card> cards, CancellationToken cancellationToken)
+        {
+            using var progress = new DownloadProgress(cards.Count());
+
+            var tasks = cards.Select(card => ProcessCardAsync(card, progress, cancellationToken));
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task ProcessCardAsync(Card card, DownloadProgress progress, CancellationToken cancellationToken)
+        {
+            await _semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                if (_config.SkipExisting && File.Exists(card.LocalPath))
+                {
+                    progress.UpdateProgress(card.Id, "Skipped - Already exists", 100);
+                    return;
+                }
+
+                await DownloadWithRetryAsync(card, progress, cancellationToken);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        private async Task DownloadWithRetryAsync(Card card, DownloadProgress progress, CancellationToken cancellationToken)
+        {
+            var policy = Policy
+                .Handle<HttpRequestException>()
+                .Or<IOException>()
+                .WaitAndRetryAsync(
+                    _config.MaxRetries,
+                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    onRetry: (exception, timeSpan, retryCount, context) =>
+                    {
+                        _logger.Warn($"Retry {retryCount} for card {card.Id} after {timeSpan.TotalSeconds}s");
+                        progress.UpdateProgress(card.Id, $"Retry {retryCount}", (retryCount * 100) / _config.MaxRetries);
+                    }
+                );
+
+            await policy.ExecuteAsync(async () =>
+            {
+                await DownloadCardImageAsync(card, progress, cancellationToken);
+            });
+        }
+
+        private async Task DownloadCardImageAsync(Card card, DownloadProgress progress, CancellationToken cancellationToken)
+        {
+            // Implement the logic to download the card image
+            // This is a placeholder method and should be replaced with actual implementation
+            await Task.Delay(1000, cancellationToken); // Simulate download delay
+            progress.UpdateProgress(card.Id, "Downloaded", 100);
+        }
+    }
+}
+```
+
+### 10. Create the `DownloadProgress` class
 
 Create a new file named `DownloadProgress.cs` in the `GwentCardDownloader` directory and add the following code:
 
@@ -222,9 +313,9 @@ namespace GwentCardDownloader
 }
 ```
 
-### 10. Update the `Downloader` class to use the `DownloadProgress` class
+### 11. Update the `Downloader` class to use the `DownloadManager` and `DownloadProgress` classes
 
-Update the `Downloader` class to use the `DownloadProgress` class for tracking download progress. Replace the existing progress tracking code with the following:
+Update the `Downloader` class to use the `DownloadManager` and `DownloadProgress` classes for managing and tracking download progress. Replace the existing progress tracking code with the following:
 
 ```csharp
 using System;
@@ -252,7 +343,7 @@ namespace GwentCardDownloader
         private readonly string resumeFilePath;
         private int currentCard;
         private int totalCards;
-        private readonly DownloadProgress downloadProgress;
+        private readonly DownloadManager downloadManager;
 
         public Downloader(string baseUrl, string imageFolder, int delay, Logger logger, string resumeFilePath)
         {
@@ -264,7 +355,7 @@ namespace GwentCardDownloader
             this.resumeFilePath = resumeFilePath;
             this.currentCard = 0;
             this.totalCards = 0;
-            this.downloadProgress = new DownloadProgress(totalCards);
+            this.downloadManager = new DownloadManager(new DownloaderConfig(), logger);
 
             // Set User-Agent header
             client.DefaultRequestHeaders.UserAgent.ParseAdd("GwentCardDownloader/1.0");
@@ -342,7 +433,7 @@ namespace GwentCardDownloader
                     await Task.Delay(delay);
 
                     // Update progress
-                    downloadProgress.UpdateProgress(cardId, $"Downloaded {cardName}", (int)((double)currentCard / totalCards * 100));
+                    downloadManager.DownloadCardsAsync(new List<Card> { new Card(cardId, cardName, "", imageUrl, true, DateTime.Now, 0, filePath) }, CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -397,7 +488,19 @@ namespace GwentCardDownloader
 }
 ```
 
-### 11. Run the application
+### 12. Implement the `DownloadCardImageAsync` method using the `Downloader` class
+
+Update the `DownloadCardImageAsync` method in the `DownloadManager` class to use the `Downloader` class for downloading card images. Replace the existing placeholder code with the following:
+
+```csharp
+private async Task DownloadCardImageAsync(Card card, DownloadProgress progress, CancellationToken cancellationToken)
+{
+    var downloader = new Downloader(_config.BaseUrl, _config.ImageFolder, _config.Delay, _logger, "resume.txt");
+    await downloader.DownloadCardImageAsync(card, progress, cancellationToken);
+}
+```
+
+### 13. Run the application
 
 Run the application using the following command:
 

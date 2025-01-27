@@ -173,5 +173,30 @@ namespace GwentCardDownloader
                 return false;
             }
         }
+
+        public async Task DownloadCardImageAsync(Card card, DownloadProgress progress, CancellationToken cancellationToken)
+        {
+            try
+            {
+                string imageUrl = card.GetImageUrl();
+                string localPath = card.GetLocalPath();
+
+                await DownloadImage(imageUrl, localPath);
+
+                if (!VerifyImage(localPath))
+                {
+                    throw new Exception("Image verification failed");
+                }
+
+                card.IsDownloaded = true;
+                card.DownloadDate = DateTime.Now;
+                progress.UpdateProgress(card.Id, "Downloaded", 100);
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, $"Failed to download image for card {card.Id}");
+                throw;
+            }
+        }
     }
 }

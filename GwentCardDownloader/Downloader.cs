@@ -24,8 +24,10 @@ namespace GwentCardDownloader
         private int currentCard;
         private int totalCards;
         private readonly ImageProcessor imageProcessor;
+        private readonly StateManager stateManager;
+        private readonly ErrorHandler errorHandler;
 
-        public Downloader(string baseUrl, string imageFolder, int delay, Logger logger, string resumeFilePath)
+        public Downloader(string baseUrl, string imageFolder, int delay, Logger logger, string resumeFilePath, StateManager stateManager, ErrorHandler errorHandler)
         {
             this.client = new HttpClient();
             this.baseUrl = baseUrl;
@@ -36,6 +38,8 @@ namespace GwentCardDownloader
             this.currentCard = 0;
             this.totalCards = 0;
             this.imageProcessor = new ImageProcessor();
+            this.stateManager = stateManager;
+            this.errorHandler = errorHandler;
 
             // Set User-Agent header
             client.DefaultRequestHeaders.UserAgent.ParseAdd("GwentCardDownloader/1.0");
@@ -123,7 +127,7 @@ namespace GwentCardDownloader
                     }
                     catch (Exception ex)
                     {
-                        logger.Error(ex, $"Error processing card");
+                        await errorHandler.HandleError(ex);
                     }
                     finally
                     {
@@ -154,7 +158,7 @@ namespace GwentCardDownloader
                 }
                 catch (Exception ex)
                 {
-                    logger.Error(ex, $"Failed to download image from {imageUrl}, attempt {attempt} of {maxRetries}");
+                    await errorHandler.HandleError(ex);
                     if (attempt == maxRetries)
                     {
                         throw;
@@ -200,7 +204,7 @@ namespace GwentCardDownloader
             }
             catch (Exception ex)
             {
-                logger.Error(ex, $"Failed to download image for card {card.Id}");
+                await errorHandler.HandleError(ex);
                 throw;
             }
         }

@@ -940,7 +940,251 @@ namespace GwentCardDownloader
 }
 ```
 
-### 18. Run the application
+### 18. Create the `ErrorHandler` class
+
+Create a new file named `ErrorHandler.cs` in the `GwentCardDownloader` directory and add the following code:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace GwentCardDownloader
+{
+    public class ErrorHandler
+    {
+        private readonly Logger _logger;
+        private readonly Dictionary<Type, Func<Exception, Task>> _handlers;
+
+        public ErrorHandler(Logger logger)
+        {
+            _logger = logger;
+            _handlers = new Dictionary<Type, Func<Exception, Task>>
+            {
+                { typeof(HttpRequestException), HandleHttpError },
+                { typeof(IOException), HandleIOError },
+                { typeof(ImageProcessingException), HandleImageError }
+            };
+        }
+
+        public async Task HandleError(Exception ex)
+        {
+            var handler = _handlers.GetValueOrDefault(ex.GetType());
+            if (handler != null)
+            {
+                await handler(ex);
+            }
+            else
+            {
+                _logger.Error(ex, "Unhandled error occurred");
+            }
+        }
+
+        private Task HandleHttpError(Exception ex)
+        {
+            _logger.Error(ex, "HTTP error occurred");
+            return Task.CompletedTask;
+        }
+
+        private Task HandleIOError(Exception ex)
+        {
+            _logger.Error(ex, "IO error occurred");
+            return Task.CompletedTask;
+        }
+
+        private Task HandleImageError(Exception ex)
+        {
+            _logger.Error(ex, "Image processing error occurred");
+            return Task.CompletedTask;
+        }
+    }
+}
+```
+
+### 19. Integrate the `ErrorHandler` class into the `Downloader` class
+
+Update the `Downloader` class to use the `ErrorHandler` class for handling errors. Replace the existing error handling code with the following:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
+using System.Threading.Tasks;
+using HtmlAgilityPack;
+using System.Linq;
+using System.Drawing;
+using System.Net.Http.Headers;
+using System.Threading;
+using NLog;
+using ShellProgressBar;
+
+namespace GwentCardDownloader
+{
+    public class Downloader
+    {
+        private readonly HttpClient client;
+        private readonly string baseUrl;
+        private readonly string imageFolder;
+        private readonly int delay;
+        private readonly Logger logger;
+        private readonly string resumeFilePath;
+        private int currentCard;
+        private int totalCards;
+        private readonly DownloadManager downloadManager;
+        private readonly StateManager stateManager;
+        private readonly ErrorHandler errorHandler;
+
+        public Downloader(string baseUrl, string imageFolder, int delay, Logger logger, string resumeFilePath)
+        {
+            this.client = new HttpClient();
+            this.baseUrl = baseUrl;
+            this.imageFolder = imageFolder;
+            this.delay = delay;
+            this.logger = logger;
+            this.resumeFilePath = resumeFilePath;
+            this.currentCard = 0;
+            this.totalCards = 0;
+            this.downloadManager = new DownloadManager(new DownloaderConfig(), logger);
+            this.stateManager = new StateManager(resumeFilePath);
+            this.errorHandler = new ErrorHandler(logger);
+
+            // Set User-Agent header
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("GwentCardDownloader/1.0");
+        }
+
+        public async Task DownloadAllCards()
+        {
+            // Get the main page content
+            var web = new HtmlWeb();
+            var doc = await web.LoadFromWebAsync(baseUrl);
+
+            // Find all card containers
+            var cardNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'gwent-card')]");
+
+            if (cardNodes == null)
+            {
+                throw new Exception("No cards found on the page.");
+            }
+
+            totalCards = cardNodes.Count;
+
+            var downloadedCards = new HashSet<string>(File.Exists(resumeFilePath) ? File.ReadAllLines(resumeFilePath) : Array.Empty<string>());
+
+            var tasks = cardNodes.Select(async cardNode =>
+            {
+                Interlocked.Increment(ref currentCard);
+
+                try
+                {
+                    // Extract card details
+                    var cardId = cardNode.GetAttributeValue("data-card-id", "");
+                    var cardName = cardNode.SelectSingleNode(".//div[contains(@class, 'card-name')]")?.InnerText.Trim();
+
+                    if (string.IsNullOrEmpty(cardId) || string.IsNullOrEmpty(cardName))
+                    {
+                        logger.Warn("Skipping card - missing information");
+                        return;
+                    }
+
+                    // Clean filename
+                    string safeFileName = string.Join("_", cardName.Split(Path.GetInvalidFileNameChars()));
+                    string filePath = Path.Combine(imageFolder, $"{safeFileName}.png");
+
+                    // Skip if file already exists
+                    if (File.Exists(filePath) || downloadedCards.Contains(cardId))
+                    {
+                        logger.Info($"Skipping existing card: {cardName}");
+                        return;
+                    }
+
+                    // Construct image URL (you might need to adjust this based on the website structure)
+                    string imageUrl = $"https://gwent.one/image/card/low/{cardId}.jpg";
+
+                    // Download the image
+                    await DownloadImage(imageUrl, filePath);
+
+                    // Verify the image
+                    if (!VerifyImage(filePath))
+                    {
+                        logger.Warn($"Image verification failed for {cardName}, retrying...");
+                        await DownloadImage(imageUrl, filePath);
+                        if (!VerifyImage(filePath))
+                        {
+                            logger.Error($"Image verification failed for {cardName} after retrying");
+                            return;
+                        }
+                    }
+
+                    logger.Info($"Downloaded ({currentCard}/{totalCards}): {cardName}");
+
+                    // Add to resume file
+                    File.AppendAllLines(resumeFilePath, new[] { cardId });
+
+                    // Add a small delay to be nice to the server
+                    await Task.Delay(delay);
+
+                    // Update progress
+                    downloadManager.DownloadCardsAsync(new List<Card> { new Card(cardId, cardName, "", imageUrl, true, DateTime.Now, 0, filePath) }, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    await errorHandler.HandleError(ex);
+                }
+            }).ToList();
+
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task DownloadImage(string imageUrl, string filePath, ImageQuality quality)
+        {
+            int maxRetries = 3;
+            int retryDelay = 2000;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    var imageBytes = await client.GetByteArrayAsync(imageUrl);
+                    await File.WriteAllBytesAsync(filePath, imageBytes);
+
+                    // Process the image based on the specified quality
+                    await imageProcessor.ProcessImageAsync(filePath, quality);
+
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    await errorHandler.HandleError(ex);
+                    if (attempt == maxRetries)
+                    {
+                        throw;
+                    }
+                    await Task.Delay(retryDelay);
+                    retryDelay *= 2; // Exponential backoff
+                }
+            }
+        }
+
+        private bool VerifyImage(string filePath)
+        {
+            try
+            {
+                using (var image = Image.FromFile(filePath))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+}
+```
+
+### 20. Run the application
 
 Run the application using the following command:
 

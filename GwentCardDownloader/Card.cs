@@ -1,10 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace GwentCardDownloader
 {
     public class Card
     {
+        // Enums for type safety
+        public enum CardType { Unit, Special, Artifact, Stratagem }
+        public enum CardRarity { Common, Rare, Epic, Legendary }
+        public enum CardColor { Bronze, Gold }
+        public enum CardStatus { Active, Retired, Modified }
+
         // Core Identifiers
         public string Id { get; set; }
         public string Name { get; set; }
@@ -12,20 +21,42 @@ namespace GwentCardDownloader
 
         // Card Properties
         public string Faction { get; set; }
-        public string Type { get; set; }  // Unit, Special, Artifact, Stratagem
-        public string Rarity { get; set; }  // Common, Rare, Epic, Legendary
-        public string Color { get; set; }  // Bronze, Gold
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public CardType Type { get; set; }
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public CardRarity Rarity { get; set; }
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public CardColor Color { get; set; }
         public int Power { get; set; }
         public int Provisions { get; set; }
-        public string Keywords { get; set; }  // Comma-separated keywords like "Deploy", "Order", etc.
-        public string Ability { get; set; }  // Card text/description
-        public string Categories { get; set; }  // Soldier, Warrior, etc.
+        
+        private string _keywords;
+        public string Keywords
+        {
+            get => _keywords;
+            set => _keywords = value?.Trim();
+        }
+        
+        public IEnumerable<string> KeywordsList => 
+            Keywords?.Split(',').Select(k => k.Trim()) ?? Enumerable.Empty<string>();
+
+        public string Ability { get; set; }
+        
+        private string _categories;
+        public string Categories
+        {
+            get => _categories;
+            set => _categories = value?.Trim();
+        }
+        
+        public IEnumerable<string> CategoriesList => 
+            Categories?.Split(',').Select(c => c.Trim()) ?? Enumerable.Empty<string>();
 
         // Art & Media
         public string ImageUrl { get; set; }
-        public string PremiumImageUrl { get; set; }  // Animated/Premium version
+        public string PremiumImageUrl { get; set; }
         public string ArtistName { get; set; }
-        public string FlavorText { get; set; }  // Lore text
+        public string FlavorText { get; set; }
 
         // Technical Properties
         public string LocalPath { get; set; }
@@ -34,55 +65,76 @@ namespace GwentCardDownloader
         public bool IsPremiumDownloaded { get; set; }
         public DateTime? DownloadDate { get; set; }
         public int RetryCount { get; set; }
+        public long FileSize { get; set; }
+        public string Checksum { get; set; }
 
         // Card Set Information
-        public string Set { get; set; }  // Base Set, Way of the Witcher, etc.
-        public string ReleaseDate { get; set; }
+        public string Set { get; set; }
+        public DateTime? ReleaseDate { get; set; }
 
         // Game Status
-        public bool IsAvailable { get; set; }  // Whether card is currently in the game
-        public string Status { get; set; }  // Active, Retired, Modified, etc.
+        public bool IsAvailable { get; set; }
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public CardStatus Status { get; set; }
 
         // Version Control
-        public string Version { get; set; }
+        public Version Version { get; set; }
         public DateTime? LastModified { get; set; }
         public string PatchNumber { get; set; }
 
         public Card()
         {
-            // Initialize collections and default values
             RetryCount = 0;
             IsDownloaded = false;
             IsPremiumDownloaded = false;
+            IsAvailable = true;
+            Status = CardStatus.Active;
         }
 
-        public override string ToString()
+        public override string ToString() =>
+            $"{Name} ({Id}) - {Faction} {Type}";
+
+        public string GetSafeFileName(bool includeFaction = true)
         {
-            return $"{Name} ({Id}) - {Faction} {Type}";
+            var nameBase = includeFaction ? $"{Faction}_{Name}" : Name;
+            return string.Join("_", nameBase.Split(Path.GetInvalidFileNameChars()))
+                        .Replace(" ", "_")
+                        .ToLowerInvariant();
         }
 
-        // Helper method to generate safe filename
-        public string GetSafeFileName()
+        public bool IsPremium() =>
+            !string.IsNullOrEmpty(PremiumImageUrl);
+
+        public string GetImageUrl(bool premium = false) =>
+            premium ? PremiumImageUrl : ImageUrl;
+
+        public string GetLocalPath(bool premium = false) =>
+            premium ? PremiumLocalPath : LocalPath;
+
+        public bool HasKeyword(string keyword) =>
+            KeywordsList.Any(k => k.Equals(keyword, StringComparison.OrdinalIgnoreCase));
+
+        public bool HasCategory(string category) =>
+            CategoriesList.Any(c => c.Equals(category, StringComparison.OrdinalIgnoreCase));
+
+        public bool IsValid() =>
+            !string.IsNullOrEmpty(Id) &&
+            !string.IsNullOrEmpty(Name) &&
+            !string.IsNullOrEmpty(ImageUrl);
+
+        public override bool Equals(object obj)
         {
-            return string.Join("_", Name.Split(Path.GetInvalidFileNameChars()));
+            if (obj is Card other)
+            {
+                return Id == other.Id;
+            }
+            return false;
         }
 
-        // Helper method to check if the card is premium
-        public bool IsPremium()
-        {
-            return !string.IsNullOrEmpty(PremiumImageUrl);
-        }
+        public override int GetHashCode() =>
+            Id?.GetHashCode() ?? 0;
 
-        // Helper method to get appropriate image URL based on quality
-        public string GetImageUrl(bool premium = false)
-        {
-            return premium ? PremiumImageUrl : ImageUrl;
-        }
-
-        // Helper method to get appropriate local path based on quality
-        public string GetLocalPath(bool premium = false)
-        {
-            return premium ? PremiumLocalPath : LocalPath;
-        }
+        public Card Clone() =>
+            (Card)MemberwiseClone();
     }
 }

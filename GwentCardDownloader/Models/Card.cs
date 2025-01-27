@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
@@ -15,8 +16,27 @@ namespace GwentCardDownloader.Models
         public enum CardStatus { Active, Retired, Modified }
 
         // Core Identifiers
-        public string Id { get; set; }
-        public string Name { get; set; }
+        private string _id;
+        [Required]
+        public string Id
+        {
+            get => _id;
+            init => _id = !string.IsNullOrWhiteSpace(value)
+                ? value
+                : throw new ArgumentException("Id cannot be empty");
+        }
+
+        private string _name;
+        [Required]
+        [StringLength(100)]
+        public string Name
+        {
+            get => _name;
+            set => _name = !string.IsNullOrWhiteSpace(value)
+                ? value
+                : throw new ArgumentException("Name cannot be empty");
+        }
+
         public string LocalizedName { get; set; }
 
         // Card Properties
@@ -29,27 +49,27 @@ namespace GwentCardDownloader.Models
         public CardColor Color { get; set; }
         public int Power { get; set; }
         public int Provisions { get; set; }
-        
+
         private string _keywords;
         public string Keywords
         {
             get => _keywords;
             set => _keywords = value?.Trim();
         }
-        
-        public IEnumerable<string> KeywordsList => 
+
+        public IEnumerable<string> KeywordsList =>
             Keywords?.Split(',').Select(k => k.Trim()) ?? Enumerable.Empty<string>();
 
         public string Ability { get; set; }
-        
+
         private string _categories;
         public string Categories
         {
             get => _categories;
             set => _categories = value?.Trim();
         }
-        
-        public IEnumerable<string> CategoriesList => 
+
+        public IEnumerable<string> CategoriesList =>
             Categories?.Split(',').Select(c => c.Trim()) ?? Enumerable.Empty<string>();
 
         // Art & Media
@@ -81,6 +101,9 @@ namespace GwentCardDownloader.Models
         public Version Version { get; set; }
         public DateTime? LastModified { get; set; }
         public string PatchNumber { get; set; }
+
+        // Computed Property
+        public double StrengthRating => (Power + Provisions) / 2.0;
 
         public Card()
         {

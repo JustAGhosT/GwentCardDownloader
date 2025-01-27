@@ -3,6 +3,9 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using NLog;
+using GwentCardDownloader.Models;
+using GwentCardDownloader.Services;
+using GwentCardDownloader.Utils;
 
 namespace GwentCardDownloader
 {
@@ -16,45 +19,33 @@ namespace GwentCardDownloader
 
         static async Task Main(string[] args)
         {
-            string baseUrl = DefaultBaseUrl;
-            string imageFolder = DefaultImageFolder;
-            int delay = DefaultDelay;
+            var commandLineParser = new CommandLineParser();
+            var config = commandLineParser.ParseArguments(args);
 
-            if (args.Length > 0)
+            if (config == null)
             {
-                baseUrl = args.ElementAtOrDefault(0) ?? DefaultBaseUrl;
-                imageFolder = args.ElementAtOrDefault(1) ?? DefaultImageFolder;
-                delay = int.TryParse(args.ElementAtOrDefault(2), out int parsedDelay) ? parsedDelay : DefaultDelay;
+                return;
             }
 
             // Create directory if it doesn't exist
-            Directory.CreateDirectory(imageFolder);
+            Directory.CreateDirectory(config.ImageFolder);
 
             // Configure logging
-            var config = new NLog.Config.LoggingConfiguration();
+            var nlogConfig = new NLog.Config.LoggingConfiguration();
             var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "logfile.txt" };
-            config.AddRule(LogLevel.Info, LogLevel.Fatal, logfile);
-            LogManager.Configuration = config;
+            nlogConfig.AddRule(LogLevel.Info, LogLevel.Fatal, logfile);
+            LogManager.Configuration = nlogConfig;
 
             try
             {
                 logger.Info("Starting Gwent card download...");
 
-                var downloaderConfig = new DownloaderConfig
-                {
-                    BaseUrl = baseUrl,
-                    ImageFolder = imageFolder,
-                    Delay = delay,
-                    MaxRetries = 3,
-                    MaxConcurrentDownloads = 5,
-                    SkipExisting = true,
-                    Quality = ImageQuality.Low,
-                    UserAgent = "GwentCardDownloader/1.0",
-                    Headers = new Dictionary<string, string>()
-                };
+                var stateManager = new StateManager(resumeFilePath);
+                var errorHandler = new ErrorHandler(new Logger());
+                var downloadManager = new DownloadManager(config, new Logger());
 
-                var downloader = new Downloader(downloaderConfig.BaseUrl, downloaderConfig.ImageFolder, downloaderConfig.Delay, new Logger(), resumeFilePath);
-                await downloader.DownloadAllCards();
+                var cards = await stateManager.LoadStateAsync();
+                await downloadManager.DownloadCardsAsync(cards.Values.Select(state => new Card { Id = state.CardId, IsDownloaded = state.IsDownloaded, RetryCount = state.RetryCount }), default);
 
                 logger.Info("Download completed!");
             }

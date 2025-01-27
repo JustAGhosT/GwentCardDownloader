@@ -40,7 +40,20 @@ namespace GwentCardDownloader
             {
                 logger.Info("Starting Gwent card download...");
 
-                var downloader = new Downloader(baseUrl, imageFolder, delay, new Logger(), resumeFilePath);
+                var downloaderConfig = new DownloaderConfig
+                {
+                    BaseUrl = baseUrl,
+                    ImageFolder = imageFolder,
+                    Delay = delay,
+                    MaxRetries = 3,
+                    MaxConcurrentDownloads = 5,
+                    SkipExisting = true,
+                    Quality = ImageQuality.Low,
+                    UserAgent = "GwentCardDownloader/1.0",
+                    Headers = new Dictionary<string, string>()
+                };
+
+                var downloader = new Downloader(downloaderConfig.BaseUrl, downloaderConfig.ImageFolder, downloaderConfig.Delay, new Logger(), resumeFilePath);
                 await downloader.DownloadAllCards();
 
                 logger.Info("Download completed!");

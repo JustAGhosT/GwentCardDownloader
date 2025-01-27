@@ -1,103 +1,136 @@
 # Gwent Card Downloader
 
-A .NET Core application that downloads card images from Gwent, the Witcher Card Game. This tool features concurrent downloads, progress tracking, image optimization, and robust error handling.
+A modern .NET Core application for downloading card images from Gwent, the Witcher Card Game. Built with performance and reliability in mind, featuring concurrent downloads, robust error handling, and comprehensive progress tracking.
 
-## Features
+## ✨ Features
 
-- 🎴 Downloads card images from gwent.one
-- 📊 Real-time progress tracking with progress bars
-- 🔄 Automatic retry mechanism for failed downloads
-- 💾 State management and resume capability
-- 🖼️ Image optimization with multiple quality options
-- 📝 Comprehensive logging
-- ⚡ Concurrent downloads with rate limiting
+- 🎴 **Smart Card Downloads**: Efficiently downloads card images from gwent.one
+- 📊 **Progress Tracking**: Real-time progress bars with detailed status information
+- 🔄 **Resilient Operations**: 
+  - Automatic retry mechanism with exponential backoff
+  - Resume capability for interrupted downloads
+  - Robust error handling
+- 🖼️ **Image Processing**:
+  - Multiple quality options
+  - Automatic image verification
+  - Optimized storage
+- 📝 **Comprehensive Logging**: Detailed activity and error logging
+- ⚡ **Performance Optimized**:
+  - Concurrent downloads
+  - Configurable rate limiting
+  - Memory-efficient processing
 
-## Prerequisites
+## 🚀 Getting Started
+
+### Prerequisites
 
 - .NET 6.0 SDK or later
 - Visual Studio 2019/2022 or VS Code (optional)
 
-## Quick Start
+### Installation
 
 1. Clone the repository:
-```sh
+```bash
 git clone https://github.com/yourusername/GwentCardDownloader.git
 cd GwentCardDownloader
 ```
 
 2. Install dependencies:
-```sh
+```bash
 dotnet restore
 ```
 
 3. Run the application:
-```sh
+```bash
 dotnet run
 ```
 
-## Configuration
+## ⚙️ Configuration
 
-The application can be configured using command-line arguments:
+### Command Line Arguments
 
-```sh
+```bash
 dotnet run -- [baseUrl] [imageFolder] [delay]
 ```
 
-- `baseUrl`: Base URL for card downloads (default: https://gwent.one/en/cards/)
-- `imageFolder`: Destination folder for downloaded images (default: gwent_cards)
-- `delay`: Delay between downloads in milliseconds (default: 100)
+| Parameter    | Description                                    | Default Value                |
+|-------------|------------------------------------------------|----------------------------|
+| baseUrl     | Base URL for card downloads                     | https://gwent.one/en/cards/ |
+| imageFolder | Destination folder for downloaded images        | gwent_cards                |
+| delay       | Delay between downloads (milliseconds)          | 100                        |
 
-## Project Structure
+## 🏗️ Project Structure
 
 ```
 GwentCardDownloader/
 ├── Program.cs                 # Application entry point
-├── Card.cs                    # Card model
-├── Downloader.cs             # Main download logic
-├── DownloadManager.cs        # Manages concurrent downloads
-├── DownloadProgress.cs       # Progress tracking
-├── ImageProcessor.cs         # Image optimization
-├── StateManager.cs           # Download state management
-└── ErrorHandler.cs           # Error handling
+├── Models/
+│   └── Card.cs               # Card data model
+├── Services/
+│   ├── DownloadManager.cs    # Manages concurrent downloads
+│   ├── StateManager.cs       # Download state management
+│   └── ErrorHandler.cs       # Error handling
+└── Utils/
+    ├── CommandLineParser.cs  # Command line argument parsing
+    └── Logger.cs             # Logging implementation
 ```
 
-## Features in Detail
+## 🎯 Features in Detail
 
 ### Image Quality Options
 
-The downloader supports three quality levels:
-- Low: 100x100px, grayscale
-- Medium: 200x200px, brightness adjusted
-- High: 300x300px, color enhanced
+| Quality Level | Resolution | Processing                    |
+|--------------|------------|-------------------------------|
+| Low          | 100x100px  | Grayscale                    |
+| Medium       | 200x200px  | Brightness adjusted          |
+| High         | 300x300px  | Color enhanced               |
 
 ### Progress Tracking
 
-The application provides real-time progress information:
-- Overall download progress
+- Overall download progress with percentage
 - Individual card download status
-- Download speed and estimated time remaining
+- Current download speed
+- Estimated time remaining
+- Failed downloads count
 
 ### Error Handling
 
-Robust error handling for:
-- Network issues
-- File system errors
-- Image processing problems
-- Automatic retries with exponential backoff
+The application implements comprehensive error handling for:
 
-## Contributing
+- 🌐 Network connectivity issues
+- 💾 File system operations
+- 🖼️ Image processing errors
+- 🔄 Rate limiting responses
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+2. Create your feature branch:
+```bash
+git checkout -b feature/AmazingFeature
+```
+3. Commit your changes:
+```bash
+git commit -m 'Add some AmazingFeature'
+```
+4. Push to the branch:
+```bash
+git push origin feature/AmazingFeature
+```
 5. Open a Pull Request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - Thanks to gwent.one for providing card data
-- Built with .NET Core and various open-source packages
+- Built with .NET Core and the following packages:
+  - NLog for logging
+  - HtmlAgilityPack for HTML parsing
+  - ShellProgressBar for console progress bars
+
+## 📝 Note
+
+This tool is for personal use only. Please respect gwent.one's terms of service and implement appropriate rate limiting in your downloads.

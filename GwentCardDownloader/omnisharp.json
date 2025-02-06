@@ -1,0 +1,13 @@
+{
+    "RoslynExtensionsOptions": {
+        "enableAnalyzersSupport": true,
+        "locationPaths": [
+            "packages",
+            "analyzers"
+        ]
+    },
+    "FormattingOptions": {
+        "enableEditorConfigSupport": true,
+        "organizeImports": true
+    }
+}

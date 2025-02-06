@@ -1,0 +1,14 @@
+{
+    "name": "GwentCardDownloader",
+    "dockerFile": "Dockerfile",
+    "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+    },
+    "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-vscode.vscode-node-azure-pack",
+        "ms-azuretools.vscode-docker"
+    ],
+    "postCreateCommand": "dotnet restore",
+    "remoteUser": "vscode"
+}

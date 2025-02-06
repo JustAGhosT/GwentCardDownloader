@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "ms-dotnettools.csharp",
+    "ms-vscode-omnisharp",
+    "ms-vscode.csharp",
+    "ms-vscode.csharp-devkit",
+    "ms-vscode.csharp-extension-pack",
+    "ms-vscode.csharp-syntax",
+    "ms-vscode.csharp-vscode",
+    "ms-vscode.csharp-vscode-devkit",
+    "ms-vscode.csharp-vscode-extension-pack",
+    "ms-vscode.csharp-vscode-syntax"
+  ]
+}

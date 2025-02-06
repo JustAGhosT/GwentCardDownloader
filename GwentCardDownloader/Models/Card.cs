@@ -53,21 +53,8 @@ namespace GwentCardDownloader.Models
 
         public string Ability { get; set; }
 
-        // Art & Media
-        public string ArtworkUrl { get; set; }
-        public string PremiumArtworkUrl { get; set; }
         public string ArtistName { get; set; }
         public string FlavorText { get; set; }
-
-        // Technical Properties
-        public string LocalPath { get; set; }
-        public string PremiumLocalPath { get; set; }
-        public bool IsDownloaded { get; set; }
-        public bool IsPremiumDownloaded { get; set; }
-        public DateTime? DownloadDate { get; set; }
-        public int RetryCount { get; set; }
-        public long FileSize { get; set; }
-        public string Checksum { get; set; }
 
         // Card Set Information
         public string Set { get; set; }
@@ -90,9 +77,6 @@ namespace GwentCardDownloader.Models
         #region Constructors
         public Card()
         {
-            RetryCount = 0;
-            IsDownloaded = false;
-            IsPremiumDownloaded = false;
             IsAvailable = true;
             Status = CardStatus.Active;
         }
@@ -109,15 +93,6 @@ namespace GwentCardDownloader.Models
                         .Replace(" ", "_")
                         .ToLowerInvariant();
         }
-
-        public bool IsPremium() =>
-            !string.IsNullOrEmpty(PremiumArtworkUrl);
-
-        public string GetArtworkUrl(bool premium = false) =>
-            premium ? PremiumArtworkUrl : ArtworkUrl;
-
-        public string GetLocalPath(bool premium = false) =>
-            premium ? PremiumLocalPath : LocalPath;
 
         // Category checking methods
         public bool HasCategory(Category category) => Categories.Contains(category);
@@ -137,7 +112,6 @@ namespace GwentCardDownloader.Models
         public bool IsValid() =>
             !string.IsNullOrEmpty(Id) &&
             !string.IsNullOrEmpty(Name) &&
-            !string.IsNullOrEmpty(ArtworkUrl) &&
             ValidateProvisions() &&
             ValidatePower();
 
@@ -218,8 +192,6 @@ namespace GwentCardDownloader.Models
                 Provisions = Provisions,
                 Rarity = Rarity,
                 Type = Type,
-                ArtworkUrl = ArtworkUrl,
-                PremiumArtworkUrl = PremiumArtworkUrl,
                 Ability = Ability,
                 Categories = new HashSet<Category>(Categories),
                 Keywords = new HashSet<Keyword>(Keywords),
@@ -227,14 +199,6 @@ namespace GwentCardDownloader.Models
                 SupportedArchetypes = new HashSet<Archetype>(SupportedArchetypes),
                 ArtistName = ArtistName,
                 FlavorText = FlavorText,
-                LocalPath = LocalPath,
-                PremiumLocalPath = PremiumLocalPath,
-                IsDownloaded = IsDownloaded,
-                IsPremiumDownloaded = IsPremiumDownloaded,
-                DownloadDate = DownloadDate,
-                RetryCount = RetryCount,
-                FileSize = FileSize,
-                Checksum = Checksum,
                 Set = Set,
                 ReleaseDate = ReleaseDate,
                 IsAvailable = IsAvailable,

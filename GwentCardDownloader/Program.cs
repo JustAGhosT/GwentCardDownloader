@@ -42,10 +42,19 @@ namespace GwentCardDownloader
 
                 var stateManager = new StateManager(resumeFilePath);
                 var errorHandler = new ErrorHandler(new Logger());
-                var downloadManager = new DownloadManager(config, new Logger());
 
-                var cards = await stateManager.LoadStateAsync();
-                await downloadManager.DownloadCardsAsync(cards.Values.Select(state => new Card { Id = state.CardId, IsDownloaded = state.IsDownloaded, RetryCount = state.RetryCount }), default);
+                // Check if the --includeimages flag is present
+                bool includeImages = args.Contains("--includeimages");
+
+                // Download card metadata
+                var jsonDataDownloader = new JsonDataDownloader(config.BaseUrl);
+                var cards = await jsonDataDownloader.DownloadCardDataAsync();
+
+                if (includeImages)
+                {
+                    var downloadManager = new DownloadManager(config, new Logger());
+                    await downloadManager.DownloadCardsAsync(cards, default);
+                }
 
                 logger.Info("Download completed!");
             }

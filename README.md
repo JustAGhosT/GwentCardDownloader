@@ -85,6 +85,45 @@ Robust error handling for:
 - Image processing problems
 - Automatic retries with exponential backoff
 
+## Metadata Extraction Feature
+
+The application now includes a feature to extract card metadata from the Gwent cards page.
+
+### Usage
+
+By default, the application will only download card metadata. To include image downloads, use the `--includeimages` flag.
+
+```sh
+dotnet run -- --includeimages
+```
+
+### Configuration
+
+The application can be configured using command-line arguments:
+
+```sh
+dotnet run -- [baseUrl] [imageFolder] [delay] [--includeimages]
+```
+
+- `baseUrl`: Base URL for card downloads (default: https://gwent.one/en/cards/)
+- `imageFolder`: Destination folder for downloaded images (default: gwent_cards)
+- `delay`: Delay between downloads in milliseconds (default: 100)
+- `--includeimages`: Include image downloads
+
+### Example
+
+To download only metadata:
+
+```sh
+dotnet run
+```
+
+To download metadata and images:
+
+```sh
+dotnet run -- --includeimages
+```
+
 ## Contributing
 
 1. Fork the repository
